@@ -1,0 +1,20 @@
+# Use the official PostgreSQL image from the Docker Hub
+FROM postgres:14
+
+# Set environment variables
+ENV POSTGRES_DB=todo_db
+ENV POSTGRES_USER=postgres
+# Note: In production, you should not set POSTGRES_PASSWORD in Dockerfile
+# It should be passed securely at runtime
+
+# Copy the initialization scripts (if any)
+# COPY init-scripts/ /docker-entrypoint-initdb.d/
+
+# Expose port
+EXPOSE 5432
+
+# Health check for PostgreSQL
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
+  CMD pg_isready -U postgres -d todo_db
+
+# The official PostgreSQL image handles startup automatically

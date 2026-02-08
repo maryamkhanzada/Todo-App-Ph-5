@@ -1,0 +1,43 @@
+# Default values for umbrella chart
+todo-frontend:
+  enabled: true
+  service:
+    type: NodePort
+    port: 3000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+todo-backend:
+  enabled: true
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+todo-postgres:
+  enabled: true
+  service:
+    type: ClusterIP
+    port: 5432
+  resources:
+    limits:
+      cpu: 1
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  postgresql:
+    auth:
+      postgresPassword: "password"
+      database: "todo_db"
