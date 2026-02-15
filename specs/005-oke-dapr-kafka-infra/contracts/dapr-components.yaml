@@ -1,0 +1,314 @@
+# Dapr Component Specifications
+# OKE Infrastructure with Dapr & Kafka
+# Date: 2026-02-15
+
+---
+# Pub/Sub Component - Kafka
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub-kafka
+  namespace: todo-app
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+    # Kafka broker connection
+    - name: brokers
+      value: "todo-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
+
+    # Consumer group (shared across services by default)
+    - name: consumerGroup
+      value: "todo-app-consumer-group"
+
+    # Authentication (disabled for internal cluster)
+    - name: authRequired
+      value: "false"
+
+    # Message format
+    - name: disableTls
+      value: "true"
+
+    # Consumer configuration
+    - name: maxMessageBytes
+      value: "1048576"  # 1MB
+
+    - name: consumeRetryInterval
+      value: "1s"
+
+    # Producer configuration
+    - name: requiredAcks
+      value: "all"
+
+    - name: maxRetry
+      value: "3"
+
+    - name: retryBackoff
+      value: "100ms"
+
+---
+# State Store Component - PostgreSQL
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: todo-app
+spec:
+  type: state.postgresql
+  version: v1
+  metadata:
+    # Connection string from Kubernetes secret
+    - name: connectionString
+      secretKeyRef:
+        name: db-credentials
+        key: connection-string
+
+    # Table configuration
+    - name: tableName
+      value: "dapr_state"
+
+    # Schema management
+    - name: cleanupIntervalInSeconds
+      value: "3600"
+
+    # Transaction support
+    - name: actorStateStore
+      value: "false"
+
+---
+# Secret Store Component - Kubernetes
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kubernetes-secrets
+  namespace: todo-app
+spec:
+  type: secretstores.kubernetes
+  version: v1
+  metadata: []
+
+---
+# Resiliency Configuration
+apiVersion: dapr.io/v1alpha1
+kind: Resiliency
+metadata:
+  name: todo-resiliency
+  namespace: todo-app
+spec:
+  policies:
+    # Retry policies
+    retries:
+      # Retry forever with constant backoff
+      pubsubRetry:
+        policy: constant
+        duration: 5s
+        maxRetries: 10
+
+      # Exponential backoff for service invocation
+      serviceRetry:
+        policy: exponential
+        maxInterval: 30s
+        maxRetries: 5
+
+      # State store retry
+      stateRetry:
+        policy: constant
+        duration: 1s
+        maxRetries: 3
+
+    # Circuit breaker policies
+    circuitBreakers:
+      # Circuit breaker for backend service
+      backendCB:
+        maxRequests: 1
+        timeout: 30s
+        trip: consecutiveFailures >= 5
+
+      # Circuit breaker for Kafka
+      kafkaCB:
+        maxRequests: 1
+        timeout: 60s
+        trip: consecutiveFailures >= 3
+
+    # Timeout policies
+    timeouts:
+      serviceTimeout: 30s
+      pubsubTimeout: 10s
+      stateTimeout: 5s
+
+  targets:
+    # Application-specific resilience
+    apps:
+      todo-backend:
+        retry: serviceRetry
+        circuitBreaker: backendCB
+        timeout: serviceTimeout
+
+      recurring-worker:
+        retry: serviceRetry
+        circuitBreaker: backendCB
+        timeout: serviceTimeout
+
+      notification-worker:
+        retry: serviceRetry
+        timeout: serviceTimeout
+
+    # Component-specific resilience
+    components:
+      pubsub-kafka:
+        outbound:
+          retry: pubsubRetry
+          circuitBreaker: kafkaCB
+          timeout: pubsubTimeout
+
+      statestore:
+        outbound:
+          retry: stateRetry
+          timeout: stateTimeout
+
+---
+# Subscription Configuration - Recurring Worker
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: recurring-worker-sub
+  namespace: todo-app
+spec:
+  pubsubname: pubsub-kafka
+  topic: task-events
+  routes:
+    default: /events/task-completed
+  deadLetterTopic: task-events-dlq
+  bulkSubscribe:
+    enabled: false
+
+---
+# Subscription Configuration - Notification Worker
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: notification-worker-sub
+  namespace: todo-app
+spec:
+  pubsubname: pubsub-kafka
+  topic: reminders
+  routes:
+    default: /events/reminder
+  deadLetterTopic: reminders-dlq
+  bulkSubscribe:
+    enabled: false
+
+---
+# Subscription Configuration - Audit Worker
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: audit-worker-task-events
+  namespace: todo-app
+spec:
+  pubsubname: pubsub-kafka
+  topic: task-events
+  routes:
+    default: /events/audit
+  bulkSubscribe:
+    enabled: true
+    maxMessagesCount: 100
+    maxAwaitDurationMs: 1000
+
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: audit-worker-reminders
+  namespace: todo-app
+spec:
+  pubsubname: pubsub-kafka
+  topic: reminders
+  routes:
+    default: /events/audit
+  bulkSubscribe:
+    enabled: true
+
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: audit-worker-updates
+  namespace: todo-app
+spec:
+  pubsubname: pubsub-kafka
+  topic: task-updates
+  routes:
+    default: /events/audit
+  bulkSubscribe:
+    enabled: true
+
+---
+# Subscription Configuration - WebSocket Worker
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: websocket-worker-sub
+  namespace: todo-app
+spec:
+  pubsubname: pubsub-kafka
+  topic: task-updates
+  routes:
+    default: /events/sync
+  bulkSubscribe:
+    enabled: false
+
+---
+# Service App Configuration Reference
+# (Applied via pod annotations)
+x-dapr-app-config:
+  todo-backend:
+    annotations:
+      dapr.io/enabled: "true"
+      dapr.io/app-id: "todo-backend"
+      dapr.io/app-port: "8000"
+      dapr.io/app-protocol: "http"
+      dapr.io/enable-api-logging: "true"
+      dapr.io/log-level: "info"
+      dapr.io/config: "todo-resiliency"
+
+  todo-frontend:
+    annotations:
+      dapr.io/enabled: "true"
+      dapr.io/app-id: "todo-frontend"
+      dapr.io/app-port: "3000"
+      dapr.io/app-protocol: "http"
+      dapr.io/enable-api-logging: "false"
+
+  recurring-worker:
+    annotations:
+      dapr.io/enabled: "true"
+      dapr.io/app-id: "recurring-worker"
+      dapr.io/app-port: "8001"
+      dapr.io/app-protocol: "http"
+      dapr.io/enable-api-logging: "true"
+      dapr.io/config: "todo-resiliency"
+
+  notification-worker:
+    annotations:
+      dapr.io/enabled: "true"
+      dapr.io/app-id: "notification-worker"
+      dapr.io/app-port: "8002"
+      dapr.io/app-protocol: "http"
+      dapr.io/enable-api-logging: "true"
+
+  audit-worker:
+    annotations:
+      dapr.io/enabled: "true"
+      dapr.io/app-id: "audit-worker"
+      dapr.io/app-port: "8003"
+      dapr.io/app-protocol: "http"
+      dapr.io/enable-api-logging: "true"
+
+  websocket-worker:
+    annotations:
+      dapr.io/enabled: "true"
+      dapr.io/app-id: "websocket-worker"
+      dapr.io/app-port: "8004"
+      dapr.io/app-protocol: "http"
+      dapr.io/enable-api-logging: "true"

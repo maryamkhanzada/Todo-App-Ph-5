@@ -1,0 +1,301 @@
+# Event Schema Definitions
+# OKE Infrastructure with Dapr & Kafka
+# Date: 2026-02-15
+
+openapi: 3.0.3
+info:
+  title: Todo Event Schemas
+  version: 1.0.0
+  description: CloudEvents-compliant event schemas for Dapr pub/sub
+
+components:
+  schemas:
+    # Base CloudEvents envelope
+    CloudEvent:
+      type: object
+      required:
+        - specversion
+        - type
+        - source
+        - id
+        - time
+      properties:
+        specversion:
+          type: string
+          enum: ["1.0"]
+          description: CloudEvents specification version
+        type:
+          type: string
+          description: Event type identifier
+        source:
+          type: string
+          description: Event source (service name)
+        id:
+          type: string
+          format: uuid
+          description: Unique event identifier
+        time:
+          type: string
+          format: date-time
+          description: Event timestamp (ISO8601)
+        datacontenttype:
+          type: string
+          default: "application/json"
+        data:
+          type: object
+          description: Event payload
+
+    # Task Events (topic: task-events)
+    TaskCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/CloudEvent'
+        - type: object
+          properties:
+            type:
+              enum: ["task.created"]
+            data:
+              $ref: '#/components/schemas/TaskEventData'
+
+    TaskUpdatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/CloudEvent'
+        - type: object
+          properties:
+            type:
+              enum: ["task.updated"]
+            data:
+              $ref: '#/components/schemas/TaskEventData'
+
+    TaskCompletedEvent:
+      allOf:
+        - $ref: '#/components/schemas/CloudEvent'
+        - type: object
+          properties:
+            type:
+              enum: ["task.completed"]
+            data:
+              $ref: '#/components/schemas/TaskCompletedData'
+
+    TaskDeletedEvent:
+      allOf:
+        - $ref: '#/components/schemas/CloudEvent'
+        - type: object
+          properties:
+            type:
+              enum: ["task.deleted"]
+            data:
+              $ref: '#/components/schemas/TaskDeletedData'
+
+    # Reminder Events (topic: reminders)
+    ReminderScheduledEvent:
+      allOf:
+        - $ref: '#/components/schemas/CloudEvent'
+        - type: object
+          properties:
+            type:
+              enum: ["reminder.scheduled"]
+            data:
+              $ref: '#/components/schemas/ReminderData'
+
+    ReminderTriggeredEvent:
+      allOf:
+        - $ref: '#/components/schemas/CloudEvent'
+        - type: object
+          properties:
+            type:
+              enum: ["reminder.triggered"]
+            data:
+              $ref: '#/components/schemas/ReminderData'
+
+    # Task Update Events (topic: task-updates)
+    TaskSyncEvent:
+      allOf:
+        - $ref: '#/components/schemas/CloudEvent'
+        - type: object
+          properties:
+            type:
+              enum: ["task.sync"]
+            data:
+              $ref: '#/components/schemas/TaskSyncData'
+
+    # Data Payloads
+    TaskEventData:
+      type: object
+      required:
+        - task_id
+        - user_id
+        - title
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        completed:
+          type: boolean
+          default: false
+        priority:
+          type: string
+          enum: [low, medium, high]
+          default: medium
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        recurrence_pattern:
+          type: string
+          nullable: true
+          description: "RRULE format (e.g., FREQ=DAILY;COUNT=10)"
+        tags:
+          type: array
+          items:
+            type: string
+          default: []
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TaskCompletedData:
+      type: object
+      required:
+        - task_id
+        - user_id
+        - completed_at
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        completed_at:
+          type: string
+          format: date-time
+        recurrence_pattern:
+          type: string
+          nullable: true
+          description: "If set, indicates this is a recurring task"
+        task_template:
+          $ref: '#/components/schemas/TaskEventData'
+          description: "Template for creating next occurrence"
+
+    TaskDeletedData:
+      type: object
+      required:
+        - task_id
+        - user_id
+        - deleted_at
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        deleted_at:
+          type: string
+          format: date-time
+
+    ReminderData:
+      type: object
+      required:
+        - task_id
+        - user_id
+        - scheduled_time
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        scheduled_time:
+          type: string
+          format: date-time
+        reminder_type:
+          type: string
+          enum: [due_date, custom]
+          default: due_date
+        task_title:
+          type: string
+          description: "Cached task title for notification"
+
+    TaskSyncData:
+      type: object
+      required:
+        - task_id
+        - user_id
+        - action
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [create, update, delete, complete]
+        task_snapshot:
+          $ref: '#/components/schemas/TaskEventData'
+          description: "Current state of the task"
+        changes:
+          type: object
+          additionalProperties: true
+          description: "Fields that changed (for update action)"
+
+# Topic Mapping
+x-kafka-topics:
+  task-events:
+    description: Task lifecycle events
+    partitions: 3
+    replication_factor: 1
+    retention_ms: 604800000  # 7 days
+    events:
+      - TaskCreatedEvent
+      - TaskUpdatedEvent
+      - TaskCompletedEvent
+      - TaskDeletedEvent
+    producers:
+      - todo-backend
+    consumers:
+      - recurring-worker
+      - audit-worker
+
+  reminders:
+    description: Scheduled reminder events
+    partitions: 1
+    replication_factor: 1
+    retention_ms: 604800000
+    events:
+      - ReminderScheduledEvent
+      - ReminderTriggeredEvent
+    producers:
+      - todo-backend
+      - dapr-scheduler
+    consumers:
+      - notification-worker
+      - audit-worker
+
+  task-updates:
+    description: Real-time sync events
+    partitions: 3
+    replication_factor: 1
+    retention_ms: 604800000
+    events:
+      - TaskSyncEvent
+    producers:
+      - todo-backend
+    consumers:
+      - websocket-worker
+      - audit-worker
