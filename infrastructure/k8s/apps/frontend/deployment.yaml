@@ -1,0 +1,129 @@
+# Frontend Deployment with Dapr Sidecar
+# Feature: 005-oke-dapr-kafka-infra
+# Task: T059
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-frontend
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-frontend
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: todo-app
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: todo-frontend
+  template:
+    metadata:
+      labels:
+        app: todo-frontend
+        app.kubernetes.io/name: todo-frontend
+        app.kubernetes.io/component: frontend
+      annotations:
+        # Dapr sidecar injection
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "todo-frontend"
+        dapr.io/app-port: "3000"
+        dapr.io/app-protocol: "http"
+        dapr.io/enable-api-logging: "true"
+        dapr.io/log-level: "info"
+        dapr.io/sidecar-cpu-request: "50m"
+        dapr.io/sidecar-cpu-limit: "200m"
+        dapr.io/sidecar-memory-request: "32Mi"
+        dapr.io/sidecar-memory-limit: "128Mi"
+    spec:
+      serviceAccountName: todo-frontend-sa
+
+      # Image pull secrets for OCIR
+      imagePullSecrets:
+        - name: ocir-secret
+
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      containers:
+        - name: frontend
+          # Update with actual OCIR path
+          image: REGION.ocir.io/TENANCY/todo-frontend:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Environment variables
+          env:
+            - name: NODE_ENV
+              value: "production"
+            # Backend API URL (via Dapr service invocation)
+            - name: NEXT_PUBLIC_API_URL
+              value: "/api"
+            # Dapr configuration
+            - name: DAPR_HTTP_PORT
+              value: "3500"
+            # Log level
+            - name: LOG_LEVEL
+              value: "info"
+
+          # Resource limits (frontend is lighter)
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+
+          # Liveness probe
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # Readiness probe
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Startup probe
+          startupProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+
+          # Security context
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+      # Graceful shutdown
+      terminationGracePeriodSeconds: 30

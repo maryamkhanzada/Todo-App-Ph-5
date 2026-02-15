@@ -1,0 +1,97 @@
+# Ingress Resource for Todo Application
+# Feature: 005-oke-dapr-kafka-infra
+# Task: T062
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: todo-ingress
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-app
+    app.kubernetes.io/component: ingress
+  annotations:
+    # Ingress class
+    kubernetes.io/ingress.class: nginx
+
+    # Rewrite rules
+    nginx.ingress.kubernetes.io/use-regex: "true"
+
+    # Proxy configuration
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Enable CORS for API
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-Correlation-ID"
+
+    # Rate limiting (optional - uncomment if needed)
+    # nginx.ingress.kubernetes.io/limit-rps: "100"
+    # nginx.ingress.kubernetes.io/limit-connections: "10"
+
+spec:
+  ingressClassName: nginx
+
+  # TLS configuration (uncomment when certificate is ready)
+  # tls:
+  #   - hosts:
+  #       - todo.example.com
+  #     secretName: todo-tls-secret
+
+  rules:
+    # Use nip.io for testing with LoadBalancer IP
+    # Replace with actual domain for production
+    - host: ""  # Empty host matches all
+      http:
+        paths:
+          # API routes -> Backend
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: todo-backend
+                port:
+                  number: 8000
+
+          # Health check endpoint
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: todo-backend
+                port:
+                  number: 8000
+
+          # All other routes -> Frontend
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: todo-frontend
+                port:
+                  number: 3000
+
+---
+# Custom Headers ConfigMap (referenced by NGINX values)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-headers
+  namespace: ingress-nginx
+data:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains"

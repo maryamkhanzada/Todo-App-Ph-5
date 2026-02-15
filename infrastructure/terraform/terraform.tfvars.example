@@ -1,0 +1,68 @@
+# Terraform Variables Example
+# Feature: 005-oke-dapr-kafka-infra
+#
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to source control
+
+# =============================================================================
+# OCI Authentication (Required)
+# =============================================================================
+
+# Find these in your OCI Console under User Settings
+tenancy_ocid     = "ocid1.tenancy.oc1..aaaaaaaa..."
+user_ocid        = "ocid1.user.oc1..aaaaaaaa..."
+fingerprint      = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+private_key_path = "~/.oci/oci_api_key.pem"
+
+# OCI Region (use one with Always Free availability)
+# Common regions: us-phoenix-1, us-ashburn-1, eu-frankfurt-1
+region = "us-phoenix-1"
+
+# =============================================================================
+# Compartment Configuration
+# =============================================================================
+
+compartment_name        = "TodoApp"
+compartment_description = "Compartment for Todo application OKE deployment"
+
+# =============================================================================
+# VCN Configuration
+# =============================================================================
+
+vcn_name            = "todo-vcn"
+vcn_cidr_block      = "10.0.0.0/16"
+vcn_dns_label       = "todovcn"
+public_subnet_cidr  = "10.0.0.0/24"
+private_subnet_cidr = "10.0.1.0/24"
+
+# =============================================================================
+# OKE Cluster Configuration
+# =============================================================================
+
+cluster_name       = "todo-oke-cluster"
+kubernetes_version = "v1.28.2"
+cluster_type       = "BASIC_CLUSTER"
+
+# =============================================================================
+# Node Pool Configuration (Always Free Optimized)
+# =============================================================================
+
+node_pool_name           = "todo-node-pool"
+node_shape               = "VM.Standard.A1.Flex"  # Ampere A1 for Always Free
+node_ocpus               = 2
+node_memory_gb           = 8
+node_count               = 1
+node_boot_volume_size_gb = 50
+
+# Leave empty to use latest OKE-compatible image
+node_image_id = ""
+
+# =============================================================================
+# Tags
+# =============================================================================
+
+freeform_tags = {
+  "Project"     = "TodoApp"
+  "Environment" = "development"
+  "ManagedBy"   = "Terraform"
+}

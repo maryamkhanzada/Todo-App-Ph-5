@@ -1,0 +1,108 @@
+# WebSocket Worker Deployment
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T133, T134
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: websocket-worker
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: websocket-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: todo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: websocket-worker
+  template:
+    metadata:
+      labels:
+        app: websocket-worker
+        app.kubernetes.io/name: websocket-worker
+        app.kubernetes.io/component: worker
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "websocket-worker"
+        dapr.io/app-port: "8004"
+        dapr.io/app-protocol: "http"
+        dapr.io/enable-api-logging: "true"
+        dapr.io/log-level: "info"
+        dapr.io/sidecar-cpu-request: "50m"
+        dapr.io/sidecar-cpu-limit: "200m"
+        dapr.io/sidecar-memory-request: "32Mi"
+        dapr.io/sidecar-memory-limit: "128Mi"
+    spec:
+      serviceAccountName: todo-worker-sa
+      imagePullSecrets:
+        - name: ocir-secret
+
+      containers:
+        - name: worker
+          image: REGION.ocir.io/TENANCY/todo-worker:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 8004
+            - name: websocket
+              containerPort: 8005
+
+          env:
+            - name: WORKER_TYPE
+              value: "websocket"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: LOG_FORMAT
+              value: "json"
+            - name: DAPR_HTTP_PORT
+              value: "3500"
+            - name: WEBSOCKET_PORT
+              value: "8005"
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8004
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: websocket-worker
+  namespace: todo-app
+spec:
+  type: ClusterIP
+  selector:
+    app: websocket-worker
+  ports:
+    - name: http
+      port: 8004
+      targetPort: 8004
+    - name: websocket
+      port: 8005
+      targetPort: 8005

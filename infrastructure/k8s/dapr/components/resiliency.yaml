@@ -1,0 +1,141 @@
+# Dapr Resiliency Configuration
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T097, T098
+
+apiVersion: dapr.io/v1alpha1
+kind: Resiliency
+metadata:
+  name: todo-resiliency
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: resiliency
+spec:
+  # ==========================================================================
+  # Retry Policies
+  # ==========================================================================
+  policies:
+    retries:
+      # Default retry policy for most operations
+      defaultRetry:
+        policy: constant
+        duration: 1s
+        maxRetries: 3
+
+      # Aggressive retry for critical operations
+      criticalRetry:
+        policy: exponential
+        maxInterval: 30s
+        maxRetries: 10
+        duration: 1s
+
+      # Light retry for non-critical operations
+      lightRetry:
+        policy: constant
+        duration: 500ms
+        maxRetries: 2
+
+      # Pub/sub specific retry
+      pubsubRetry:
+        policy: exponential
+        maxInterval: 60s
+        maxRetries: 5
+        duration: 2s
+
+    # ==========================================================================
+    # Timeout Policies
+    # ==========================================================================
+    timeouts:
+      # Default timeout
+      defaultTimeout: 30s
+
+      # Fast operations
+      fastTimeout: 5s
+
+      # Slow operations (database, external APIs)
+      slowTimeout: 60s
+
+      # Pub/sub operations
+      pubsubTimeout: 120s
+
+    # ==========================================================================
+    # Circuit Breaker Policies
+    # ==========================================================================
+    circuitBreakers:
+      # Default circuit breaker
+      defaultCB:
+        maxRequests: 1
+        interval: 0s
+        timeout: 30s
+        trip: consecutiveFailures >= 5
+
+      # Pub/sub circuit breaker (more tolerant)
+      pubsubCB:
+        maxRequests: 2
+        interval: 30s
+        timeout: 60s
+        trip: consecutiveFailures >= 10
+
+      # External service circuit breaker (less tolerant)
+      externalCB:
+        maxRequests: 1
+        interval: 0s
+        timeout: 10s
+        trip: consecutiveFailures >= 3
+
+  # ==========================================================================
+  # Target Applications
+  # ==========================================================================
+  targets:
+    apps:
+      # Backend service
+      todo-backend:
+        retry: defaultRetry
+        timeout: defaultTimeout
+        circuitBreaker: defaultCB
+
+      # Recurring worker
+      recurring-worker:
+        retry: criticalRetry
+        timeout: slowTimeout
+        circuitBreaker: pubsubCB
+
+      # Notification worker
+      notification-worker:
+        retry: defaultRetry
+        timeout: defaultTimeout
+        circuitBreaker: defaultCB
+
+      # Audit worker
+      audit-worker:
+        retry: lightRetry
+        timeout: fastTimeout
+        circuitBreaker: defaultCB
+
+    # ==========================================================================
+    # Target Components
+    # ==========================================================================
+    components:
+      # Kafka pub/sub
+      pubsub-kafka:
+        outbound:
+          retry: pubsubRetry
+          timeout: pubsubTimeout
+          circuitBreaker: pubsubCB
+        inbound:
+          retry: pubsubRetry
+          timeout: pubsubTimeout
+          circuitBreaker: pubsubCB
+
+      # PostgreSQL state store
+      statestore:
+        outbound:
+          retry: criticalRetry
+          timeout: slowTimeout
+          circuitBreaker: defaultCB
+
+      # Kubernetes secret store
+      kubernetes-secrets:
+        outbound:
+          retry: defaultRetry
+          timeout: fastTimeout

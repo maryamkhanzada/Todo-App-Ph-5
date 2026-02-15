@@ -1,0 +1,72 @@
+# Strimzi Kafka Operator Installation Notes
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T067, T068, T069
+#
+# This file documents the Strimzi operator installation process.
+# The operator is installed via Helm, not raw manifests.
+#
+# =============================================================================
+# Installation Commands
+# =============================================================================
+#
+# 1. Add Strimzi Helm repository:
+#    helm repo add strimzi https://strimzi.io/charts/
+#    helm repo update
+#
+# 2. Install Strimzi operator:
+#    helm install strimzi strimzi/strimzi-kafka-operator \
+#      --namespace kafka \
+#      --create-namespace \
+#      --set watchNamespaces="{kafka}" \
+#      --set resources.requests.cpu=100m \
+#      --set resources.requests.memory=256Mi \
+#      --set resources.limits.cpu=500m \
+#      --set resources.limits.memory=512Mi
+#
+# 3. Verify installation:
+#    kubectl get pods -n kafka
+#    kubectl get crd | grep strimzi
+#
+# =============================================================================
+# Expected CRDs after installation
+# =============================================================================
+# - kafkas.kafka.strimzi.io
+# - kafkatopics.kafka.strimzi.io
+# - kafkausers.kafka.strimzi.io
+# - kafkaconnects.kafka.strimzi.io
+# - kafkamirrormakers.kafka.strimzi.io
+# - kafkabridges.kafka.strimzi.io
+# - kafkarebalances.kafka.strimzi.io
+#
+# =============================================================================
+# Troubleshooting
+# =============================================================================
+#
+# Check operator logs:
+#   kubectl logs -n kafka deployment/strimzi-cluster-operator
+#
+# Check operator status:
+#   kubectl get deployment -n kafka strimzi-cluster-operator
+#
+# =============================================================================
+
+---
+# Placeholder for custom operator configuration if needed
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: strimzi-operator-notes
+  namespace: kafka
+  labels:
+    app.kubernetes.io/name: strimzi
+    app.kubernetes.io/component: documentation
+data:
+  install-command: |
+    helm install strimzi strimzi/strimzi-kafka-operator \
+      --namespace kafka \
+      --create-namespace \
+      --set watchNamespaces="{kafka}"
+
+  verify-command: |
+    kubectl get pods -n kafka -l strimzi.io/kind=cluster-operator
+    kubectl get crd | grep strimzi

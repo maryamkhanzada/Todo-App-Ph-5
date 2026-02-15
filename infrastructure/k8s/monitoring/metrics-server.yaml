@@ -1,0 +1,72 @@
+# Metrics Server Installation Notes
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T145, T146
+#
+# Note: OKE clusters typically have Metrics Server pre-installed.
+# Use this file if you need to install or customize it.
+#
+# =============================================================================
+# Verify Metrics Server
+# =============================================================================
+#
+# Check if metrics server is already installed:
+#   kubectl get deployment metrics-server -n kube-system
+#
+# Test metrics availability:
+#   kubectl top nodes
+#   kubectl top pods -n todo-app
+#
+# =============================================================================
+# Installation (if not present)
+# =============================================================================
+#
+# Using Helm:
+#   helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+#   helm install metrics-server metrics-server/metrics-server \
+#     --namespace kube-system \
+#     --set args[0]="--kubelet-insecure-tls" \
+#     --set resources.requests.cpu=100m \
+#     --set resources.requests.memory=200Mi
+#
+# Or using kubectl:
+#   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+#
+
+---
+# Custom Metrics Server configuration (if needed)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metrics-server-notes
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: metrics-server
+    app.kubernetes.io/component: documentation
+data:
+  installation-notes: |
+    Metrics Server Installation Notes for OKE
+
+    1. Check if already installed:
+       kubectl get deployment metrics-server -n kube-system
+
+    2. Verify metrics are working:
+       kubectl top nodes
+       kubectl top pods -n todo-app
+
+    3. If HPA is not scaling:
+       - Check metrics server logs: kubectl logs -n kube-system -l k8s-app=metrics-server
+       - Verify API service: kubectl get apiservice v1beta1.metrics.k8s.io
+
+  troubleshooting: |
+    Common Issues:
+
+    1. "metrics not available" error:
+       - Wait 1-2 minutes for metrics server to collect data
+       - Check metrics server pod is running
+
+    2. HPA showing <unknown> for metrics:
+       - Verify resource requests are set on pods
+       - Check metrics server connectivity
+
+    3. Permission denied:
+       - Verify RBAC permissions for metrics server

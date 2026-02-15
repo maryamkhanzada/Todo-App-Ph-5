@@ -1,0 +1,76 @@
+# Kubernetes Namespace Definitions
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T036, T037
+
+---
+# =============================================================================
+# Todo Application Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: todo-app
+  labels:
+    name: todo-app
+    project: todo
+    # Dapr sidecar injection enabled
+    dapr.io/enabled: "true"
+  annotations:
+    description: "Todo application workloads (frontend, backend, workers)"
+
+---
+# =============================================================================
+# Kafka/Strimzi Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+  labels:
+    name: kafka
+    project: todo
+  annotations:
+    description: "Kafka cluster and Strimzi operator"
+
+---
+# =============================================================================
+# Dapr System Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dapr-system
+  labels:
+    name: dapr-system
+    project: todo
+  annotations:
+    description: "Dapr runtime components (operator, sentry, placement, scheduler)"
+
+---
+# =============================================================================
+# Monitoring Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    project: todo
+  annotations:
+    description: "Observability tools (metrics, logging, tracing)"
+
+---
+# =============================================================================
+# Ingress Namespace (for NGINX Ingress Controller)
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    name: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+  annotations:
+    description: "NGINX Ingress Controller"

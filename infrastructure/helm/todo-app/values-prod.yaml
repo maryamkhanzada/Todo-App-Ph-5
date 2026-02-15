@@ -1,0 +1,154 @@
+# Production Environment Values
+# Feature: 005-oke-dapr-kafka-infra
+# Task: T175
+
+# Override values for production environment
+
+# =============================================================================
+# Global
+# =============================================================================
+global:
+  imageRegistry: "us-phoenix-1.ocir.io"
+  namespace: todo-app
+
+# =============================================================================
+# Backend - Production Settings
+# =============================================================================
+backend:
+  replicas: 2
+
+  image:
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  env:
+    ENVIRONMENT: production
+    LOG_LEVEL: info
+    LOG_FORMAT: json
+
+  dapr:
+    logLevel: info
+    enableApiLogging: false
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# =============================================================================
+# Frontend - Production Settings
+# =============================================================================
+frontend:
+  replicas: 2
+
+  image:
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+  env:
+    NODE_ENV: production
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# =============================================================================
+# Workers - Production Settings
+# =============================================================================
+workers:
+  recurring:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+
+  notification:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+
+  audit:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+  websocket:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+
+# =============================================================================
+# Ingress - Production with TLS
+# =============================================================================
+ingress:
+  enabled: true
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: todo.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: backend
+          port: 8000
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 3000
+  tls:
+    - secretName: todo-tls-secret
+      hosts:
+        - todo.example.com
+
+# =============================================================================
+# Network Policies - Enforced in Production
+# =============================================================================
+networkPolicies:
+  enabled: true
+
+# =============================================================================
+# Resource Quotas
+# =============================================================================
+resourceQuota:
+  enabled: true
+  cpu: "8"
+  memory: "16Gi"
+  pods: "50"

@@ -1,0 +1,104 @@
+# Audit Worker Deployment
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T131, T132
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-worker
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: audit-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: todo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: audit-worker
+  template:
+    metadata:
+      labels:
+        app: audit-worker
+        app.kubernetes.io/name: audit-worker
+        app.kubernetes.io/component: worker
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "audit-worker"
+        dapr.io/app-port: "8003"
+        dapr.io/app-protocol: "http"
+        dapr.io/enable-api-logging: "true"
+        dapr.io/log-level: "info"
+        dapr.io/sidecar-cpu-request: "50m"
+        dapr.io/sidecar-cpu-limit: "200m"
+        dapr.io/sidecar-memory-request: "32Mi"
+        dapr.io/sidecar-memory-limit: "128Mi"
+    spec:
+      serviceAccountName: todo-worker-sa
+      imagePullSecrets:
+        - name: ocir-secret
+
+      containers:
+        - name: worker
+          image: REGION.ocir.io/TENANCY/todo-worker:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 8003
+
+          env:
+            - name: WORKER_TYPE
+              value: "audit"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: LOG_FORMAT
+              value: "json"
+            - name: DAPR_HTTP_PORT
+              value: "3500"
+            # State store for audit logs
+            - name: STATE_STORE_NAME
+              value: "statestore"
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8003
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-worker
+  namespace: todo-app
+spec:
+  type: ClusterIP
+  selector:
+    app: audit-worker
+  ports:
+    - name: http
+      port: 8003
+      targetPort: 8003

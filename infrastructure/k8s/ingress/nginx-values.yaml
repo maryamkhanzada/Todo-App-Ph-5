@@ -1,0 +1,83 @@
+# NGINX Ingress Controller Helm Values
+# Feature: 005-oke-dapr-kafka-infra
+# Task: T039
+#
+# Install command:
+# helm install ingress-nginx ingress-nginx/ingress-nginx \
+#   --namespace ingress-nginx \
+#   --create-namespace \
+#   -f infrastructure/k8s/ingress/nginx-values.yaml
+
+controller:
+  # Replica count for high availability (set to 1 for Always Free tier)
+  replicaCount: 1
+
+  # Resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  # Service configuration for OCI Load Balancer
+  service:
+    type: LoadBalancer
+    annotations:
+      # OCI Load Balancer shape (flexible for cost efficiency)
+      service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+      # Minimum bandwidth in Mbps
+      service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "10"
+      # Maximum bandwidth in Mbps
+      service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "100"
+      # Load balancer visibility (public for external access)
+      oci.oraclecloud.com/load-balancer-type: "lb"
+      # Health check configuration
+      service.beta.kubernetes.io/oci-load-balancer-health-check-protocol: "HTTP"
+      service.beta.kubernetes.io/oci-load-balancer-health-check-path: "/healthz"
+      service.beta.kubernetes.io/oci-load-balancer-health-check-port: "10254"
+
+  # Enable metrics for HPA
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false  # Enable if using Prometheus Operator
+
+  # Admission webhooks (disabled for simplicity)
+  admissionWebhooks:
+    enabled: false
+
+  # Ingress class configuration
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: true
+
+  # Config map overrides for security headers
+  config:
+    # Security headers
+    add-headers: "ingress-nginx/custom-headers"
+    # Enable compression
+    use-gzip: "true"
+    # Proxy buffer size
+    proxy-buffer-size: "8k"
+    # Client body size limit
+    client-max-body-size: "10m"
+    # Timeouts
+    proxy-connect-timeout: "30"
+    proxy-read-timeout: "120"
+    proxy-send-timeout: "120"
+
+# Default backend (optional)
+defaultBackend:
+  enabled: false
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false  # Enable for production with multiple replicas
+
+# Service account
+serviceAccount:
+  create: true
+  name: ingress-nginx-sa

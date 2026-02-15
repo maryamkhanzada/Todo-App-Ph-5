@@ -1,0 +1,24 @@
+# Frontend Service
+# Feature: 005-oke-dapr-kafka-infra
+# Task: T060
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-frontend
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-frontend
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: todo-app
+  annotations:
+    dapr.io/app-id: "todo-frontend"
+spec:
+  type: ClusterIP
+  selector:
+    app: todo-frontend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP

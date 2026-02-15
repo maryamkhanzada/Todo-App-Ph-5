@@ -1,0 +1,55 @@
+# Dapr State Store Component - PostgreSQL
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T093, T094
+
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: statestore
+spec:
+  type: state.postgresql
+  version: v1
+  metadata:
+    # Connection string from Kubernetes secret
+    - name: connectionString
+      secretKeyRef:
+        name: db-credentials
+        key: connection-string
+
+    # Table name for Dapr state
+    - name: tableName
+      value: "dapr_state"
+
+    # Actor state table (if using actors)
+    - name: actorStateTable
+      value: "dapr_actor_state"
+
+    # Metadata table prefix
+    - name: metadataTableName
+      value: "dapr_metadata"
+
+    # Cleanup interval for expired state
+    - name: cleanupIntervalInSeconds
+      value: "300"
+
+    # Key prefix (for multi-tenant isolation)
+    - name: keyPrefix
+      value: "none"
+
+    # Enable transactions
+    - name: enableTLS
+      value: "false"
+
+# Specify which apps can use this component
+auth:
+  secretStore: kubernetes-secrets
+
+# Scopes limit which apps can access this component
+scopes:
+  - todo-backend
+  - recurring-worker
+  - notification-worker

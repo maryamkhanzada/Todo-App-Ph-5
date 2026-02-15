@@ -1,0 +1,139 @@
+# Kafka Topics Configuration
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T076, T077, T078
+
+---
+# =============================================================================
+# Task Events Topic (T076)
+# =============================================================================
+# Used for: task-created, task-updated, task-completed, task-deleted events
+# Consumers: recurring-worker, audit-worker
+
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: task-events
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: todo-kafka
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: topic
+spec:
+  # 3 partitions for parallel processing
+  partitions: 3
+  # Replication factor (must be 1 for single broker)
+  replicas: 1
+  config:
+    # Retention: 7 days
+    retention.ms: 604800000
+    # Segment size: 100MB
+    segment.bytes: 104857600
+    # Cleanup policy
+    cleanup.policy: delete
+    # Minimum in-sync replicas
+    min.insync.replicas: 1
+
+---
+# =============================================================================
+# Reminders Topic (T077)
+# =============================================================================
+# Used for: scheduled reminder events for tasks with due dates
+# Consumers: notification-worker
+# Single partition to maintain order
+
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: reminders
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: todo-kafka
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: topic
+spec:
+  # Single partition for ordering
+  partitions: 1
+  replicas: 1
+  config:
+    # Retention: 3 days (reminders don't need long retention)
+    retention.ms: 259200000
+    # Cleanup policy
+    cleanup.policy: delete
+    min.insync.replicas: 1
+
+---
+# =============================================================================
+# Task Updates Topic (T078)
+# =============================================================================
+# Used for: real-time task state changes for WebSocket broadcast
+# Consumers: websocket-worker
+
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: task-updates
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: todo-kafka
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: topic
+spec:
+  # 3 partitions for parallel processing
+  partitions: 3
+  replicas: 1
+  config:
+    # Short retention: 1 day (real-time updates are ephemeral)
+    retention.ms: 86400000
+    # Compact cleanup for latest state
+    cleanup.policy: delete
+    min.insync.replicas: 1
+
+---
+# =============================================================================
+# Dead Letter Queue Topic
+# =============================================================================
+# Used for: failed message processing (retry exhausted)
+# Consumers: monitoring/alerting
+
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: dlq-events
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: todo-kafka
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: topic
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    # Long retention for debugging: 30 days
+    retention.ms: 2592000000
+    cleanup.policy: delete
+    min.insync.replicas: 1
+
+---
+# =============================================================================
+# Audit Events Topic
+# =============================================================================
+# Used for: comprehensive audit trail of all operations
+# Consumers: audit-worker
+
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: audit-events
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: todo-kafka
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: topic
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    # Long retention for compliance: 90 days
+    retention.ms: 7776000000
+    cleanup.policy: delete
+    min.insync.replicas: 1

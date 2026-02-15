@@ -1,0 +1,171 @@
+# Resource Quotas and Limit Ranges
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T043, T044, T045, T046
+
+---
+# =============================================================================
+# Resource Quota for todo-app namespace (T043)
+# =============================================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: todo-app-quota
+  namespace: todo-app
+spec:
+  hard:
+    # CPU limits
+    requests.cpu: "2"
+    limits.cpu: "4"
+    # Memory limits
+    requests.memory: 4Gi
+    limits.memory: 8Gi
+    # Pod count
+    pods: "20"
+    # Persistent volume claims
+    persistentvolumeclaims: "5"
+    # Services
+    services: "10"
+    services.loadbalancers: "1"
+    services.nodeports: "0"
+    # Secrets and ConfigMaps
+    secrets: "20"
+    configmaps: "20"
+
+---
+# =============================================================================
+# Resource Quota for kafka namespace (T044)
+# =============================================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: kafka-quota
+  namespace: kafka
+spec:
+  hard:
+    # CPU limits (Kafka needs more resources)
+    requests.cpu: "2"
+    limits.cpu: "4"
+    # Memory limits (Kafka is memory-intensive)
+    requests.memory: 6Gi
+    limits.memory: 10Gi
+    # Pod count
+    pods: "10"
+    # No external services for Kafka
+    services.loadbalancers: "0"
+    services.nodeports: "0"
+
+---
+# =============================================================================
+# Resource Quota for monitoring namespace (T045)
+# =============================================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: monitoring-quota
+  namespace: monitoring
+spec:
+  hard:
+    # CPU limits
+    requests.cpu: "500m"
+    limits.cpu: "1"
+    # Memory limits
+    requests.memory: 1Gi
+    limits.memory: 2Gi
+    # Pod count
+    pods: "10"
+    # Services
+    services: "5"
+    services.loadbalancers: "0"
+    services.nodeports: "0"
+
+---
+# =============================================================================
+# LimitRange for todo-app namespace (T046)
+# =============================================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: todo-app-limit-range
+  namespace: todo-app
+spec:
+  limits:
+    # Default limits for containers
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      min:
+        cpu: 50m
+        memory: 64Mi
+      max:
+        cpu: 2
+        memory: 2Gi
+
+    # Pod-level limits
+    - type: Pod
+      max:
+        cpu: 4
+        memory: 4Gi
+      min:
+        cpu: 50m
+        memory: 64Mi
+
+    # PVC limits
+    - type: PersistentVolumeClaim
+      min:
+        storage: 1Gi
+      max:
+        storage: 50Gi
+
+---
+# =============================================================================
+# LimitRange for kafka namespace
+# =============================================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: kafka-limit-range
+  namespace: kafka
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 1
+        memory: 2Gi
+      defaultRequest:
+        cpu: 250m
+        memory: 512Mi
+      min:
+        cpu: 100m
+        memory: 256Mi
+      max:
+        cpu: 2
+        memory: 4Gi
+
+---
+# =============================================================================
+# LimitRange for monitoring namespace
+# =============================================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: monitoring-limit-range
+  namespace: monitoring
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 200m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      min:
+        cpu: 25m
+        memory: 32Mi
+      max:
+        cpu: 500m
+        memory: 1Gi

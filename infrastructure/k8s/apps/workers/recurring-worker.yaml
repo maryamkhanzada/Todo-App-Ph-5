@@ -1,0 +1,107 @@
+# Recurring Worker Deployment
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T121, T122, T123
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recurring-worker
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: recurring-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: todo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recurring-worker
+  template:
+    metadata:
+      labels:
+        app: recurring-worker
+        app.kubernetes.io/name: recurring-worker
+        app.kubernetes.io/component: worker
+      annotations:
+        # Dapr sidecar injection
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "recurring-worker"
+        dapr.io/app-port: "8001"
+        dapr.io/app-protocol: "http"
+        dapr.io/enable-api-logging: "true"
+        dapr.io/log-level: "info"
+        # Sidecar resources
+        dapr.io/sidecar-cpu-request: "50m"
+        dapr.io/sidecar-cpu-limit: "200m"
+        dapr.io/sidecar-memory-request: "32Mi"
+        dapr.io/sidecar-memory-limit: "128Mi"
+    spec:
+      serviceAccountName: todo-worker-sa
+      imagePullSecrets:
+        - name: ocir-secret
+
+      containers:
+        - name: worker
+          image: REGION.ocir.io/TENANCY/todo-worker:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 8001
+
+          env:
+            - name: WORKER_TYPE
+              value: "recurring"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: LOG_FORMAT
+              value: "json"
+            - name: DAPR_HTTP_PORT
+              value: "3500"
+            # Backend service URL (via Dapr service invocation)
+            - name: BACKEND_APP_ID
+              value: "todo-backend"
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: recurring-worker
+  namespace: todo-app
+spec:
+  type: ClusterIP
+  selector:
+    app: recurring-worker
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001

@@ -1,0 +1,150 @@
+# Dapr Subscriptions Configuration
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T124, T125, T135, T136, T137
+
+---
+# =============================================================================
+# Recurring Worker Subscription
+# =============================================================================
+# Subscribes to task-events for processing recurring task completions
+
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: recurring-worker-subscription
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: subscription
+spec:
+  # Pub/sub component name
+  pubsubname: pubsub-kafka
+  # Topic to subscribe to
+  topic: task-events
+  # Route for incoming messages
+  routes:
+    default: /events/task-events
+  # Scoped to specific app
+  scopes:
+    - recurring-worker
+
+---
+# =============================================================================
+# Notification Worker Subscription
+# =============================================================================
+# Subscribes to reminders topic for sending notifications
+
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: notification-worker-subscription
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: subscription
+spec:
+  pubsubname: pubsub-kafka
+  topic: reminders
+  routes:
+    default: /events/reminders
+  scopes:
+    - notification-worker
+
+---
+# =============================================================================
+# Audit Worker Subscriptions
+# =============================================================================
+# Subscribes to all topics for audit logging
+
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: audit-worker-task-events
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: subscription
+spec:
+  pubsubname: pubsub-kafka
+  topic: task-events
+  routes:
+    default: /events/audit
+  scopes:
+    - audit-worker
+
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: audit-worker-reminders
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: subscription
+spec:
+  pubsubname: pubsub-kafka
+  topic: reminders
+  routes:
+    default: /events/audit
+  scopes:
+    - audit-worker
+
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: audit-worker-task-updates
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: subscription
+spec:
+  pubsubname: pubsub-kafka
+  topic: task-updates
+  routes:
+    default: /events/audit
+  scopes:
+    - audit-worker
+
+---
+# =============================================================================
+# WebSocket Worker Subscription
+# =============================================================================
+# Subscribes to task-updates for real-time broadcast
+
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: websocket-worker-subscription
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: subscription
+spec:
+  pubsubname: pubsub-kafka
+  topic: task-updates
+  routes:
+    default: /events/task-updates
+  scopes:
+    - websocket-worker
+
+---
+# =============================================================================
+# Dead Letter Queue Subscription (for monitoring)
+# =============================================================================
+
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: dlq-monitor-subscription
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: subscription
+spec:
+  pubsubname: pubsub-kafka
+  topic: dlq-events
+  routes:
+    default: /events/dlq
+  scopes:
+    - audit-worker

@@ -1,0 +1,282 @@
+# Default values for todo-app Helm chart
+# Feature: 005-oke-dapr-kafka-infra
+# Task: T173
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+global:
+  # Container registry
+  imageRegistry: ""  # e.g., "us-phoenix-1.ocir.io"
+  imagePullSecrets:
+    - name: ocir-secret
+
+  # Namespace
+  namespace: todo-app
+
+  # Common labels
+  labels:
+    app.kubernetes.io/part-of: todo-app
+    app.kubernetes.io/managed-by: helm
+
+# =============================================================================
+# Backend Configuration
+# =============================================================================
+backend:
+  enabled: true
+  name: todo-backend
+
+  image:
+    repository: todo-backend
+    tag: latest
+    pullPolicy: Always
+
+  replicas: 1
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Health probes
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+  # Dapr configuration
+  dapr:
+    enabled: true
+    appId: todo-backend
+    appPort: 8000
+    logLevel: info
+    enableApiLogging: true
+
+  # Environment variables
+  env:
+    ENVIRONMENT: production
+    LOG_LEVEL: info
+    LOG_FORMAT: json
+
+  # HPA configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+
+# =============================================================================
+# Frontend Configuration
+# =============================================================================
+frontend:
+  enabled: true
+  name: todo-frontend
+
+  image:
+    repository: todo-frontend
+    tag: latest
+    pullPolicy: Always
+
+  replicas: 1
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+  dapr:
+    enabled: true
+    appId: todo-frontend
+    appPort: 3000
+    logLevel: info
+
+  env:
+    NODE_ENV: production
+
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+
+# =============================================================================
+# Workers Configuration
+# =============================================================================
+workers:
+  recurring:
+    enabled: true
+    name: recurring-worker
+    image:
+      repository: todo-worker
+      tag: latest
+    replicas: 1
+    port: 8001
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+    dapr:
+      appId: recurring-worker
+      appPort: 8001
+
+  notification:
+    enabled: true
+    name: notification-worker
+    image:
+      repository: todo-worker
+      tag: latest
+    replicas: 1
+    port: 8002
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+    dapr:
+      appId: notification-worker
+      appPort: 8002
+
+  audit:
+    enabled: true
+    name: audit-worker
+    image:
+      repository: todo-worker
+      tag: latest
+    replicas: 1
+    port: 8003
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+    dapr:
+      appId: audit-worker
+      appPort: 8003
+
+  websocket:
+    enabled: true
+    name: websocket-worker
+    image:
+      repository: todo-worker
+      tag: latest
+    replicas: 1
+    port: 8004
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+    dapr:
+      appId: websocket-worker
+      appPort: 8004
+
+# =============================================================================
+# Ingress Configuration
+# =============================================================================
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+  hosts:
+    - host: ""
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: backend
+          port: 8000
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 3000
+  tls: []
+  # - secretName: todo-tls-secret
+  #   hosts:
+  #     - todo.example.com
+
+# =============================================================================
+# Service Accounts
+# =============================================================================
+serviceAccounts:
+  backend:
+    create: true
+    name: todo-backend-sa
+  frontend:
+    create: true
+    name: todo-frontend-sa
+  worker:
+    create: true
+    name: todo-worker-sa
+
+# =============================================================================
+# Secrets (reference existing secrets)
+# =============================================================================
+secrets:
+  database:
+    name: db-credentials
+  jwt:
+    name: jwt-secret
+  cohere:
+    name: cohere-api-key
+
+# =============================================================================
+# Network Policies
+# =============================================================================
+networkPolicies:
+  enabled: true
+
+# =============================================================================
+# Resource Quotas
+# =============================================================================
+resourceQuota:
+  enabled: true
+  cpu: "4"
+  memory: "8Gi"
+  pods: "20"

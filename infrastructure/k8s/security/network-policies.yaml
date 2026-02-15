@@ -1,0 +1,245 @@
+# Network Policies for Todo Application
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T155, T156, T157, T158
+
+---
+# =============================================================================
+# Default Deny All (T155)
+# =============================================================================
+# Start with deny-all and explicitly allow required traffic
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-app
+    app.kubernetes.io/component: security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# =============================================================================
+# Allow DNS (Required for all pods)
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: todo-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# =============================================================================
+# Allow Ingress to Frontend and Backend (T156)
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-apps
+  namespace: todo-app
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - todo-frontend
+          - todo-backend
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000  # Frontend
+        - protocol: TCP
+          port: 8000  # Backend
+
+---
+# =============================================================================
+# Allow Kafka Access for Workers (T157)
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-access
+  namespace: todo-app
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: worker
+  policyTypes:
+    - Egress
+  egress:
+    # Allow to Kafka namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kafka
+      ports:
+        - protocol: TCP
+          port: 9092  # Kafka plaintext
+        - protocol: TCP
+          port: 9093  # Kafka TLS
+
+---
+# Allow backend to Kafka
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-kafka
+  namespace: todo-app
+spec:
+  podSelector:
+    matchLabels:
+      app: todo-backend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9093
+
+---
+# =============================================================================
+# Allow Dapr Sidecar Communication (T158)
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dapr-sidecar
+  namespace: todo-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow Dapr sidecar ports from within namespace
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3500   # Dapr HTTP
+        - protocol: TCP
+          port: 50001  # Dapr gRPC
+        - protocol: TCP
+          port: 9090   # Dapr metrics
+  egress:
+    # Allow to Dapr system namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: dapr-system
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 50005  # Dapr placement
+        - protocol: TCP
+          port: 50001  # Dapr gRPC
+
+---
+# =============================================================================
+# Allow Internal Service Communication
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal-services
+  namespace: todo-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from same namespace (internal services)
+    - from:
+        - podSelector: {}
+  egress:
+    # Allow to same namespace
+    - to:
+        - podSelector: {}
+
+---
+# =============================================================================
+# Allow External HTTPS (for API calls, OCIR, etc.)
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-https
+  namespace: todo-app
+spec:
+  podSelector:
+    matchLabels:
+      app: todo-backend
+  policyTypes:
+    - Egress
+  egress:
+    # Allow HTTPS to external services
+    - ports:
+        - protocol: TCP
+          port: 443
+
+---
+# =============================================================================
+# Kafka Namespace - Allow from todo-app
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-todo-app
+  namespace: kafka
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: todo-app
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9093

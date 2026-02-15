@@ -1,0 +1,212 @@
+# RBAC Configuration
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T048, T049, T050, T051
+
+---
+# =============================================================================
+# Read-Only ClusterRole (T048)
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: todo-readonly
+  labels:
+    app.kubernetes.io/name: todo-app
+    app.kubernetes.io/component: rbac
+rules:
+  # View pods and deployments
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "endpoints", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  # View ingress
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  # View HPA
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  # View events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+
+---
+# =============================================================================
+# Deployment ClusterRole for CI/CD (T049)
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: todo-deployer
+  labels:
+    app.kubernetes.io/name: todo-app
+    app.kubernetes.io/component: rbac
+rules:
+  # Manage deployments
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Manage services
+  - apiGroups: [""]
+    resources: ["services", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Manage pods (for rollout status)
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "delete"]
+  # Manage ingress
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Manage HPA
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # View events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  # Manage Dapr components
+  - apiGroups: ["dapr.io"]
+    resources: ["components", "configurations", "subscriptions", "resiliencies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# =============================================================================
+# ServiceAccount for GitHub Actions (T050)
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: github-actions-sa
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-app
+    app.kubernetes.io/component: ci-cd
+  annotations:
+    description: "Service account for GitHub Actions CI/CD pipeline"
+
+---
+# =============================================================================
+# RoleBinding for Deployment in todo-app namespace (T051)
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-actions-deployer
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-app
+    app.kubernetes.io/component: rbac
+subjects:
+  - kind: ServiceAccount
+    name: github-actions-sa
+    namespace: todo-app
+roleRef:
+  kind: ClusterRole
+  name: todo-deployer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# =============================================================================
+# ServiceAccount for Backend Service
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: todo-backend-sa
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-backend
+    app.kubernetes.io/component: backend
+  annotations:
+    description: "Service account for Todo backend service"
+
+---
+# =============================================================================
+# ServiceAccount for Frontend Service
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: todo-frontend-sa
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-frontend
+    app.kubernetes.io/component: frontend
+  annotations:
+    description: "Service account for Todo frontend service"
+
+---
+# =============================================================================
+# ServiceAccount for Worker Services
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: todo-worker-sa
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-worker
+    app.kubernetes.io/component: worker
+  annotations:
+    description: "Service account for Todo worker services"
+
+---
+# =============================================================================
+# Role for Backend Service (Dapr state and pub/sub access)
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: todo-backend-role
+  namespace: todo-app
+rules:
+  # Read secrets (for Dapr secret store)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  # Read configmaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+---
+# =============================================================================
+# RoleBinding for Backend Service
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: todo-backend-binding
+  namespace: todo-app
+subjects:
+  - kind: ServiceAccount
+    name: todo-backend-sa
+    namespace: todo-app
+roleRef:
+  kind: Role
+  name: todo-backend-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# =============================================================================
+# RoleBinding for Worker Services
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: todo-worker-binding
+  namespace: todo-app
+subjects:
+  - kind: ServiceAccount
+    name: todo-worker-sa
+    namespace: todo-app
+roleRef:
+  kind: Role
+  name: todo-backend-role
+  apiGroup: rbac.authorization.k8s.io

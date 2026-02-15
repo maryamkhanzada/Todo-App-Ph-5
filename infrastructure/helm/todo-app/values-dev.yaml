@@ -1,0 +1,123 @@
+# Development Environment Values
+# Feature: 005-oke-dapr-kafka-infra
+# Task: T174
+
+# Override values for development environment
+
+# =============================================================================
+# Global
+# =============================================================================
+global:
+  imageRegistry: "us-phoenix-1.ocir.io"
+  namespace: todo-app-dev
+
+# =============================================================================
+# Backend - Development Settings
+# =============================================================================
+backend:
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+  env:
+    ENVIRONMENT: development
+    LOG_LEVEL: debug
+    LOG_FORMAT: json
+
+  dapr:
+    logLevel: debug
+    enableApiLogging: true
+
+  autoscaling:
+    enabled: false
+
+# =============================================================================
+# Frontend - Development Settings
+# =============================================================================
+frontend:
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  env:
+    NODE_ENV: development
+
+  autoscaling:
+    enabled: false
+
+# =============================================================================
+# Workers - Development Settings
+# =============================================================================
+workers:
+  recurring:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 128Mi
+
+  notification:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 128Mi
+
+  audit:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+
+  websocket:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 128Mi
+
+# =============================================================================
+# Ingress - Development
+# =============================================================================
+ingress:
+  enabled: true
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  tls: []
+
+# =============================================================================
+# Network Policies - Relaxed for Development
+# =============================================================================
+networkPolicies:
+  enabled: false
+
+# =============================================================================
+# Resource Quotas - Higher for Development
+# =============================================================================
+resourceQuota:
+  enabled: false

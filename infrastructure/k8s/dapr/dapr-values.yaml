@@ -1,0 +1,111 @@
+# Dapr Helm Values
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T086, T087
+#
+# Install command:
+# helm install dapr dapr/dapr \
+#   --namespace dapr-system \
+#   --create-namespace \
+#   -f infrastructure/k8s/dapr/dapr-values.yaml
+
+global:
+  # Registry and image settings
+  registry: docker.io/daprio
+  tag: "1.12.4"
+
+  # High availability mode (disabled for Always Free tier)
+  ha:
+    enabled: false
+
+  # Enable mTLS between Dapr sidecars
+  mtls:
+    enabled: true
+    workloadCertTTL: "24h"
+    allowedClockSkew: "15m"
+
+  # Logging configuration
+  logAsJson: true
+  logLevel: info
+
+  # Image pull policy
+  imagePullPolicy: IfNotPresent
+
+  # DNS configuration
+  dnsSuffix: ".cluster.local"
+
+  # Enable Prometheus metrics
+  prometheus:
+    enabled: true
+    port: 9090
+
+# Dapr Operator
+dapr_operator:
+  replicaCount: 1
+  logLevel: info
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Dapr Sidecar Injector
+dapr_sidecar_injector:
+  replicaCount: 1
+  logLevel: info
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # Sidecar defaults
+  sidecarRunAsNonRoot: true
+  sidecarReadOnlyRootFilesystem: true
+  sidecarDropALLCapabilities: true
+
+# Dapr Sentry (Certificate Authority)
+dapr_sentry:
+  replicaCount: 1
+  logLevel: info
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Dapr Placement (Actor placement)
+dapr_placement:
+  replicaCount: 1
+  logLevel: info
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Dapr Scheduler (for Jobs API)
+dapr_scheduler:
+  enabled: true
+  replicaCount: 1
+  logLevel: info
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # Scheduler storage (uses etcd internally)
+  etcd:
+    enabled: true
+
+# Dapr Dashboard (optional - for development)
+dapr_dashboard:
+  enabled: false

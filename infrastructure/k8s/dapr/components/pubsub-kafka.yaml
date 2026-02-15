@@ -1,0 +1,74 @@
+# Dapr Pub/Sub Component - Kafka
+# Feature: 005-oke-dapr-kafka-infra
+# Tasks: T090, T091
+
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub-kafka
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: dapr
+    app.kubernetes.io/component: pubsub
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+    # Kafka broker connection
+    - name: brokers
+      value: "todo-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
+
+    # Consumer group prefix (will be suffixed with app-id)
+    - name: consumerGroup
+      value: "todo-app"
+
+    # Authentication (none for internal cluster)
+    - name: authRequired
+      value: "false"
+
+    # Consumer configuration
+    - name: initialOffset
+      value: "oldest"
+
+    # Producer configuration
+    - name: maxMessageBytes
+      value: "1048576"  # 1MB
+
+    # Delivery semantics
+    - name: disableTls
+      value: "true"
+
+    # Retry configuration
+    - name: consumeRetryInterval
+      value: "100ms"
+
+    # Heartbeat and session timeouts
+    - name: heartbeatInterval
+      value: "3s"
+    - name: sessionTimeout
+      value: "30s"
+
+    # Client ID for tracking
+    - name: clientID
+      value: "todo-app-dapr"
+
+---
+# Pub/Sub Component for Kafka with TLS (alternative)
+# Uncomment when using TLS listener
+# apiVersion: dapr.io/v1alpha1
+# kind: Component
+# metadata:
+#   name: pubsub-kafka-tls
+#   namespace: todo-app
+# spec:
+#   type: pubsub.kafka
+#   version: v1
+#   metadata:
+#     - name: brokers
+#       value: "todo-kafka-kafka-bootstrap.kafka.svc.cluster.local:9093"
+#     - name: consumerGroup
+#       value: "todo-app"
+#     - name: disableTls
+#       value: "false"
+#     - name: authRequired
+#       value: "false"
